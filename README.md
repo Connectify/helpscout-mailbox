@@ -1,9 +1,9 @@
 # helpscout-mailbox
 
-[![PyPI](https://img.shields.io/pypi/v/helpscout-mailbox.svg)](https://pypi.org/project/helpscout-mailbox/)
-[![Python Versions](https://img.shields.io/pypi/pyversions/helpscout-mailbox.svg)](https://pypi.org/project/helpscout-mailbox/)
-[![License](https://img.shields.io/pypi/l/helpscout-mailbox.svg)](https://github.com/Connectify/helpscout-mailbox/blob/main/COPYING)
-[![Tests](https://github.com/Connectify/helpscout-mailbox/actions/workflows/test.yml/badge.svg)](https://github.com/Connectify/helpscout-mailbox/actions/workflows/test.yml)
+[![PyPI](https://img.shields.io/pypi/v/helpscout-mailbox.svg?cacheSeconds=3600)](https://pypi.org/project/helpscout-mailbox/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/helpscout-mailbox.svg?cacheSeconds=3600)](https://pypi.org/project/helpscout-mailbox/)
+[![License](https://img.shields.io/pypi/l/helpscout-mailbox.svg?cacheSeconds=3600)](https://github.com/Connectify/helpscout-mailbox/blob/main/COPYING)
+[![Tests](https://github.com/Connectify/helpscout-mailbox/actions/workflows/test.yml/badge.svg?cacheSeconds=3600)](https://github.com/Connectify/helpscout-mailbox/actions/workflows/test.yml)
 
 A Python client for the [HelpScout Mailbox API v2](https://developer.helpscout.com/mailbox-api/).
 
