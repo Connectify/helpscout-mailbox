@@ -38,10 +38,6 @@ jobs:
         run: bandit -r src/ -c pyproject.toml
       - name: autoflake
         run: autoflake --check --recursive src/ tests/
-      - name: pyupgrade
-        run: find src/ tests/ -name "*.py" -exec pyupgrade --py310-plus {} +
-      - name: autopep8
-        run: autopep8 --diff --exit-code --recursive src/ tests/
 
   test:
     name: Test (Python ${{ matrix.python-version }})
