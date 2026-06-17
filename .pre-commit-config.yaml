@@ -1,0 +1,54 @@
+---
+repos:
+  - hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+    repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+  - hooks:
+      - id: black
+    repo: https://github.com/psf/black
+    rev: 25.1.0
+  - hooks:
+      - id: flake8
+    repo: https://github.com/PyCQA/flake8
+    rev: 7.1.2
+  - hooks:
+      - id: isort
+    repo: https://github.com/PyCQA/isort/
+    rev: 6.0.1
+  - hooks:
+      - args: [-c, "pyproject.toml"]
+        id: bandit
+        additional_dependencies: ["bandit[toml]"]
+    repo: https://github.com/PyCQA/bandit/
+    rev: 1.8.3
+  - hooks:
+      - id: autoflake
+    repo: https://github.com/PyCQA/autoflake/
+    rev: v2.3.1
+  - hooks:
+      - id: pyupgrade
+    repo: https://github.com/asottile/pyupgrade/
+    rev: v3.19.1
+  - hooks:
+      - id: autopep8
+    repo: https://github.com/hhatto/autopep8/
+    rev: v2.3.2
+  - hooks:
+      - id: mdformat
+    repo: https://github.com/executablebooks/mdformat/
+    rev: 0.7.22
+  # - hooks:
+  #     - id: numpydoc-validation
+  #   repo: https://github.com/numpy/numpydoc
+  #   rev: v1.8.0
+  - hooks:
+      - additional_dependencies:
+          - types-requests
+        args:
+          - --config-file=pyproject.toml
+        id: mypy
+    repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.15.0

@@ -1,0 +1,89 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "helpscout-mailbox"
+version = "1.0.0"
+description = "Python client for the HelpScout Mailbox API v2"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+requires-python = ">=3.10"
+authors = [{ name = "Connectify", email = "devops@connectify.com" }]
+keywords = ["helpscout", "mailbox", "api", "client", "support", "customer-service"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+dependencies = ["requests>=2.28.0"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "responses>=0.23.0",
+    "black>=24.0",
+    "flake8>=7.0",
+    "isort>=5.0",
+    "mypy>=1.0",
+    "types-requests>=2.28",
+    "bandit[toml]>=1.7",
+    "autoflake>=2.0",
+    "pyupgrade>=3.0",
+    "autopep8>=2.0",
+    "pre-commit>=3.0",
+]
+docs = ["pdoc>=14.0"]
+
+[project.urls]
+Homepage = "https://connectify.github.io/helpscout-mailbox/"
+Documentation = "https://connectify.github.io/helpscout-mailbox/"
+Repository = "https://github.com/Connectify/helpscout-mailbox"
+Issues = "https://github.com/Connectify/helpscout-mailbox/issues"
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/tests", "/README.md", "/COPYING", "/CONTRIBUTING.md", "/CODE_OF_CONDUCT.md"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/helpscout_mailbox"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/helpscout_mailbox/py.typed" = "helpscout_mailbox/py.typed"
+
+[tool.black]
+line-length = 120
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+strict = true
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --cov=helpscout_mailbox --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["src/helpscout_mailbox"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]
