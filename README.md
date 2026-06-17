@@ -2,7 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/helpscout-mailbox.svg)](https://pypi.org/project/helpscout-mailbox/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/helpscout-mailbox.svg)](https://pypi.org/project/helpscout-mailbox/)
-[![License](https://img.shields.io/pypi/l/helpscout-mailbox.svg)](https://github.com/Connectify/helpscout-mailbox/blob/main/LICENSE)
+[![License](https://img.shields.io/pypi/l/helpscout-mailbox.svg)](https://github.com/Connectify/helpscout-mailbox/blob/main/COPYING)
 [![Tests](https://github.com/Connectify/helpscout-mailbox/actions/workflows/test.yml/badge.svg)](https://github.com/Connectify/helpscout-mailbox/actions/workflows/test.yml)
 
 A Python client for the [HelpScout Mailbox API v2](https://developer.helpscout.com/mailbox-api/).
@@ -57,12 +57,14 @@ client.add_tags(12345, ["billing", "processed"])
 ## API Coverage
 
 ### Conversations
+
 - `search_conversations(query, since)` - Search with client-side date filtering
 - `get_conversation(conversation_id)` - Fetch conversation details
 - `snooze_conversation(conversation_id, snoozed_until)` - Snooze conversation
 - `add_tags(conversation_id, tags)` - Add tags (preserves existing)
 
 ### Threads
+
 - `conversation_threads(conversation_id)` - List threads (cached)
 - `conversation_body(conversation_id)` - Concatenated HTML body
 - `add_note(conversation_id, text)` - Create note thread
@@ -71,6 +73,7 @@ client.add_tags(12345, ["billing", "processed"])
 - `send_draft(conversation_id, thread_id)` - Send draft reply
 
 ### Attachments
+
 - `attachment_data(conversation_id, attachment_id)` - Download attachment bytes
 
 ## Environment Variables
@@ -85,11 +88,12 @@ client.add_tags(12345, ["billing", "processed"])
 The client uses OAuth2 client-credentials flow. Create an app at **HelpScout → Your Profile → My Apps**:
 
 1. Click "Create My App"
-2. Give it a name (e.g., "Invoice Processor")
-3. Copy the **App ID** and **App Secret**
-4. Set them as environment variables
+1. Give it a name (e.g., "Invoice Processor")
+1. Copy the **App ID** and **App Secret**
+1. Set them as environment variables
 
 The client automatically:
+
 - Fetches access tokens on initialization
 - Refreshes tokens before expiry
 - Retries on 401 with fresh token
@@ -109,6 +113,7 @@ except HelpScoutError as e:
 ```
 
 The client automatically retries:
+
 - **429 rate limits** (respects `Retry-After` header)
 - **5xx server errors** (exponential backoff)
 - **Transport failures** (connection resets, timeouts)

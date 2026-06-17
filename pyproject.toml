@@ -79,7 +79,7 @@ exclude_dirs = ["tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --cov=helpscout_mailbox --cov-report=term-missing"
+addopts = "-v"
 
 [tool.coverage.run]
 source = ["src/helpscout_mailbox"]
