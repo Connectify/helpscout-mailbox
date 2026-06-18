@@ -4,17 +4,17 @@ build-backend = "hatchling.build"
 
 [project]
 name = "helpscout-mailbox"
-version = "1.0.1"
+version = "1.0.2"
 description = "Python client for the HelpScout Mailbox API v2"
 readme = "README.md"
-license = "GPL-3.0-or-later"
+license = "BSD-3-Clause"
 requires-python = ">=3.10"
 authors = [{ name = "Connectify", email = "devops@connectify.com" }]
 keywords = ["helpscout", "mailbox", "api", "client", "support", "customer-service"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -51,7 +51,7 @@ Repository = "https://github.com/Connectify/helpscout-mailbox"
 Issues = "https://github.com/Connectify/helpscout-mailbox/issues"
 
 [tool.hatch.build.targets.sdist]
-include = ["/src", "/tests", "/README.md", "/COPYING", "/CONTRIBUTING.md", "/CODE_OF_CONDUCT.md"]
+include = ["/src", "/tests", "/README.md", "/LICENSE", "/CONTRIBUTING.md", "/CODE_OF_CONDUCT.md"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/helpscout_mailbox"]

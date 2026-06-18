@@ -2,10 +2,12 @@
 
 [![PyPI](https://img.shields.io/pypi/v/helpscout-mailbox.svg?cacheSeconds=3600)](https://pypi.org/project/helpscout-mailbox/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/helpscout-mailbox.svg?cacheSeconds=3600)](https://pypi.org/project/helpscout-mailbox/)
-[![License](https://img.shields.io/pypi/l/helpscout-mailbox.svg?cacheSeconds=3600)](https://github.com/Connectify/helpscout-mailbox/blob/main/COPYING)
+[![License](https://img.shields.io/pypi/l/helpscout-mailbox.svg?cacheSeconds=3600)](https://github.com/Connectify/helpscout-mailbox/blob/main/LICENSE)
 [![Tests](https://github.com/Connectify/helpscout-mailbox/actions/workflows/test.yml/badge.svg?cacheSeconds=3600)](https://github.com/Connectify/helpscout-mailbox/actions/workflows/test.yml)
 
 A Python client for the [HelpScout Mailbox API v2](https://developer.helpscout.com/mailbox-api/).
+
+> **Disclaimer:** This package is **unofficial** and **not associated with or endorsed by HelpScout**. It is provided "as is" without warranty of any kind. Please use [GitHub Discussions](https://github.com/Connectify/helpscout-mailbox/discussions) for support — there is no guarantee that Connectify staff will respond.
 
 ## Features
 
@@ -147,13 +149,13 @@ pdoc -o docs/ helpscout_mailbox
 
 ## Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Patches via pull request are welcome — please file an issue first to discuss the change before submitting a PR. Issues are not for technical support; use [Discussions](#support) for that. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-GPL-3.0-or-later. See [COPYING](COPYING) for details.
+BSD-3-Clause. See [LICENSE](LICENSE) for details.
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/Connectify/helpscout-mailbox/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Connectify/helpscout-mailbox/discussions) — for questions and support
 - **HelpScout API Docs**: [developer.helpscout.com](https://developer.helpscout.com/mailbox-api/)

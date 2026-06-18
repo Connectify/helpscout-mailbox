@@ -116,7 +116,7 @@ def example_function(param1: str, param2: int) -> bool:
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the GPL-3.0-or-later license.
+By contributing, you agree that your contributions will be licensed under the BSD-3-Clause license.
 
 No Contributor License Agreement (CLA) is required.
 
