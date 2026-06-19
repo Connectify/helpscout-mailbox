@@ -1,5 +1,6 @@
 """Tests for the HelpScout client."""
 
+import json
 import os
 from datetime import date, datetime, timezone
 from unittest.mock import patch
@@ -91,6 +92,34 @@ def test_snooze_conversation_issues_put() -> None:
     snooze_call = responses.calls[1]
     assert snooze_call.request.url == "https://api.helpscout.net/v2/conversations/7/snooze"
     assert snooze_call.request.method == "PUT"
+
+
+@responses.activate
+def test_close_conversation_issues_patch() -> None:
+    """close_conversation PATCHes the status to closed and clears the cache."""
+    responses.add(
+        responses.POST,
+        "https://api.helpscout.net/v2/oauth2/token",
+        json={"access_token": "test_token", "expires_in": 3600},
+        status=200,
+    )
+    responses.add(
+        responses.PATCH,
+        "https://api.helpscout.net/v2/conversations/7",
+        status=204,
+    )
+    with patch.dict(os.environ, {"HELPSCOUT_APP_ID": "test_id", "HELPSCOUT_APP_SECRET": "test_secret"}):
+        client = HelpScoutClient()
+    client._thread_cache[7] = [{"id": 1}]
+    client.close_conversation(7)
+    # Verify cache was cleared
+    assert 7 not in client._thread_cache
+    # Verify request was made
+    assert len(responses.calls) == 2  # token + close
+    close_call = responses.calls[1]
+    assert close_call.request.url == "https://api.helpscout.net/v2/conversations/7"
+    assert close_call.request.method == "PATCH"
+    assert json.loads(close_call.request.body) == {"op": "replace", "path": "/status", "value": "closed"}
 
 
 @responses.activate

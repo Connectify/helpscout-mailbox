@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "helpscout-mailbox"
-version = "1.0.2"
+version = "1.0.3"
 description = "Python client for the HelpScout Mailbox API v2"
 readme = "README.md"
 license = "BSD-3-Clause"

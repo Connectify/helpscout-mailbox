@@ -467,6 +467,26 @@ class HelpScoutClient:
         )
         self._thread_cache.pop(conversation_id, None)
 
+    def close_conversation(self, conversation_id: int) -> None:
+        """
+        Close a conversation, removing it from the active queue for good.
+
+        Unlike :meth:`snooze_conversation`, which only hides a conversation
+        until a future time, closing it is permanent until something reopens
+        it. The API updates the status field in place.
+
+        Parameters
+        ----------
+        conversation_id : int
+            The HelpScout conversation id.
+        """
+        self._send(
+            "patch",
+            f"/conversations/{conversation_id}",
+            body={"op": "replace", "path": "/status", "value": "closed"},
+        )
+        self._thread_cache.pop(conversation_id, None)
+
     def add_tags(self, conversation_id: int, tags: list[str]) -> None:
         """
         Add tags to a conversation, preserving its existing tags.
