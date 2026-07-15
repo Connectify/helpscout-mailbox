@@ -149,3 +149,26 @@ def test_rate_limit_retry() -> None:
     result = client.get_conversation(123)
     assert result["id"] == 123
     assert len(responses.calls) == 3  # token + 429 + retry success
+
+
+@responses.activate
+def test_token_refresh_retries_transport_error() -> None:
+    """A transport-level failure during the OAuth2 token POST is retried, not fatal."""
+    import requests
+
+    responses.add(
+        responses.POST, "https://api.helpscout.net/v2/oauth2/token", body=requests.exceptions.ConnectionError("boom")
+    )
+    responses.add(
+        responses.POST,
+        "https://api.helpscout.net/v2/oauth2/token",
+        json={"access_token": "tok", "expires_in": 3600},
+        status=200,
+    )
+    with (
+        patch.dict(os.environ, {"HELPSCOUT_APP_ID": "id", "HELPSCOUT_APP_SECRET": "secret"}),
+        patch("helpscout_mailbox.client.time.sleep"),
+    ):
+        client = HelpScoutClient()
+    assert client._session.headers["Authorization"] == "Bearer tok"
+    assert len(responses.calls) == 2  # first attempt raised, retried once

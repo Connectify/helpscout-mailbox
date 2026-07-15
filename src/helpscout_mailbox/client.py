@@ -82,6 +82,48 @@ class HelpScoutClient:
         self._thread_cache: dict[int, list[dict[str, Any]]] = {}
         self._refresh_token()
 
+    def _request_with_transport_retry(self, method: str, url: str, **kwargs: Any) -> requests.Response:
+        """
+        Issue a request, retrying transport-level failures with backoff.
+
+        Transport-level failures (RemoteDisconnected, timeouts, reset
+        connections) raise instead of returning a response, so they must be
+        caught here or they abort the run. They are transient, so retry with
+        backoff. Status codes are left for the caller to interpret; this covers
+        both :meth:`_send` and the OAuth2 token POST in :meth:`_refresh_token`.
+
+        Parameters
+        ----------
+        method : str
+            HTTP method, e.g. ``get`` or ``post``.
+        url : str
+            Fully-qualified request URL.
+        **kwargs : Any
+            Extra arguments forwarded to ``requests.Session.request``.
+
+        Returns
+        -------
+        requests.Response
+            The response, regardless of status code.
+
+        Raises
+        ------
+        HelpScoutError
+            If every attempt fails at the transport level.
+        """
+        last_exc: requests.exceptions.RequestException | None = None
+        for attempt in range(5):
+            try:
+                return self._session.request(method, url, timeout=TIMEOUT, **kwargs)
+            except requests.exceptions.RequestException as exc:
+                last_exc = exc
+                wait = 5 * (attempt + 1)
+                logger.warning(
+                    f"HelpScout request error on {url}: {exc}; retrying in {wait}s (attempt {attempt + 1}/5)"
+                )
+                time.sleep(wait)
+        raise HelpScoutError(f"HelpScout {method.upper()} {url} failed (transport) after 5 attempts") from last_exc
+
     def _refresh_token(self) -> None:
         """
         Fetch a fresh access token and store it on the session.
@@ -91,10 +133,10 @@ class HelpScoutClient:
         HelpScoutError
             If the token request fails.
         """
-        response = self._session.post(
+        response = self._request_with_transport_retry(
+            "post",
             TOKEN_URL,
             data={"grant_type": "client_credentials", "client_id": self._app_id, "client_secret": self._app_secret},
-            timeout=TIMEOUT,
         )
         if response.status_code != 200:
             raise HelpScoutError(f"OAuth2 token request failed ({response.status_code}): {response.text}")
@@ -135,22 +177,10 @@ class HelpScoutClient:
         """
         if time.time() >= self._token_expires_at:
             self._refresh_token()
-        last_exc: requests.exceptions.RequestException | None = None
         for attempt in range(5):
-            # Transport-level failures (RemoteDisconnected, timeouts, reset
-            # connections) raise instead of returning a response, so they must
-            # be caught here or they escape the status-code retries below and
-            # abort the run. They are transient, so retry with backoff (#5715).
-            try:
-                response = self._session.request(method, f"{BASE_URL}{path}", params=params, json=body, timeout=TIMEOUT)
-            except requests.exceptions.RequestException as exc:
-                last_exc = exc
-                wait = 5 * (attempt + 1)
-                logger.warning(
-                    f"HelpScout request error on {path}: {exc}; retrying in {wait}s (attempt {attempt + 1}/5)"
-                )
-                time.sleep(wait)
-                continue
+            # Transport-level failures are retried inside the helper; this loop
+            # handles status-code-driven retries (429 backoff, 401 refresh, 5xx).
+            response = self._request_with_transport_retry(method, f"{BASE_URL}{path}", params=params, json=body)
             if response.status_code == 429:
                 wait = int(response.headers.get("Retry-After", "10"))
                 logger.warning(f"HelpScout rate limit hit; sleeping {wait}s (attempt {attempt + 1}/5)")
@@ -169,9 +199,7 @@ class HelpScoutClient:
             if response.status_code >= 400:
                 raise HelpScoutError(f"{method.upper()} {path} failed ({response.status_code}): {response.text}")
             return response
-        raise HelpScoutError(
-            f"{method.upper()} {path} still failing (429/5xx/transport) after 5 attempts"
-        ) from last_exc
+        raise HelpScoutError(f"{method.upper()} {path} still failing (429/5xx) after 5 attempts")
 
     def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """
