@@ -131,7 +131,26 @@ def example_function(param1: str, param2: int) -> bool:
 
 - Update README.md for user-facing changes
 - Docstrings generate API docs automatically via pdoc
-- Build docs locally: `pdoc -o docs/ helpscout_mailbox`
+- Build docs locally: `pdoc -t templates/ -o docs/ helpscout_mailbox`
+
+The `-t templates/` is not optional — `templates/module.html.jinja2` overrides pdoc's `nav_members` macro to group the sidebar under labelled headings. Building without it produces a flat list and will not match what CI publishes.
+
+#### Adding a method to the sidebar groups
+
+pdoc hands Jinja the names, kinds and docstrings of members, but **not** source comments, so the group banners in `client.py` are invisible to the template. Group membership is therefore declared separately, in `NAV_GROUPS` at the top of `templates/module.html.jinja2`:
+
+```jinja
+{% set NAV_GROUPS = [
+    ("Conversations", ["create_conversation", "get_conversation", "search_conversations"]),
+    ...
+] %}
+```
+
+When you add a public method, add its name to the matching list. If you forget, the method still appears — under an **Other** heading in a different colour, at the bottom of the class. That is deliberate: a missing entry should be visible on the page rather than silently dropped or attached to the wrong group. If you see "Other" on the published docs, something needs adding to `NAV_GROUPS`.
+
+Private methods (underscore-prefixed) are hidden by pdoc and need no entry.
+
+So a new public method takes three edits: the method in its group in `client.py`, its name in the class docstring's group list, and its name in `NAV_GROUPS`.
 
 ## License
 
