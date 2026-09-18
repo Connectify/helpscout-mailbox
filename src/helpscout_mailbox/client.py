@@ -72,7 +72,31 @@ class HelpScoutClient:
     Authenticates with the OAuth2 client-credentials flow using the app id and
     secret from the ``HELPSCOUT_APP_ID`` / ``HELPSCOUT_APP_SECRET`` environment
     variables (create the app under HelpScout → Your Profile → My Apps).
+
+    Methods are grouped by what they act on, and the documentation lists them in
+    that order:
+
+    **Conversations — create and read**
+        :meth:`create_conversation`, :meth:`get_conversation`,
+        :meth:`search_conversations`
+
+    **Threads — read**
+        :meth:`conversation_threads`, :meth:`conversation_body`,
+        :meth:`attachment_data`
+
+    **Threads — write**
+        :meth:`add_note`, :meth:`create_reply`, :meth:`update_thread_text`,
+        :meth:`send_draft`
+
+    **Conversation state**
+        :meth:`snooze_conversation`, :meth:`close_conversation`, :meth:`add_tags`
+
+    Keep new methods inside the group they belong to — the generated docs and
+    their sidebar follow source order, so appending to the end scatters the
+    listing.
     """
+
+    # ---- internals ----------------------------------------------------------
 
     def __init__(self) -> None:
         self._app_id = _getenv_or_fail(APP_ID_ENVVAR)
@@ -225,6 +249,112 @@ class HelpScoutClient:
         payload: dict[str, Any] = self._send("get", path, params=params).json()
         return payload
 
+    def _created_resource_id(self, response: requests.Response, action: str) -> int:
+        """
+        Extract the ``Resource-ID`` header of a creation response.
+
+        Parameters
+        ----------
+        response : requests.Response
+            The 201 response of a create request.
+        action : str
+            Description of the request, for the error message.
+
+        Returns
+        -------
+        int
+            The id of the created resource.
+
+        Raises
+        ------
+        HelpScoutError
+            If the response carries no ``Resource-ID`` header.
+        """
+        resource_id = response.headers.get("Resource-ID")
+        if resource_id is None:
+            raise HelpScoutError(f"{action} returned no Resource-ID header")
+        return int(resource_id)
+
+    # ---- conversations: create and read -------------------------------------
+
+    def create_conversation(
+        self,
+        mailbox_id: int,
+        subject: str,
+        customer_email: str,
+        text: str,
+        *,
+        draft: bool = False,
+        tags: list[str] | None = None,
+        status: str = "active",
+    ) -> int:
+        """
+        Open a new email conversation addressed to a customer.
+
+        Parameters
+        ----------
+        mailbox_id : int
+            The HelpScout mailbox to open the conversation in.
+        subject : str
+            The conversation subject.
+        customer_email : str
+            Address of the customer the conversation is with.
+        text : str
+            The message body (HTML allowed).
+        draft : bool
+            When ``True`` the outgoing reply is saved as a draft and **no email is
+            sent**, so it can be reviewed and edited before going out. Publish it
+            afterwards with :meth:`send_draft`, which preserves any edits made in
+            HelpScout. When ``False`` the message is delivered immediately.
+        tags : list[str] | None
+            Tags to apply to the new conversation.
+        status : str
+            Conversation status, one of ``active``, ``closed``, ``open``,
+            ``pending`` or ``spam``. Note there is no ``draft`` status — drafting
+            is a property of the reply thread, which is what ``draft`` controls.
+
+        Returns
+        -------
+        int
+            The id of the created conversation.
+
+        Raises
+        ------
+        HelpScoutError
+            If the API rejects the request or returns no ``Resource-ID`` header.
+        """
+        thread: dict[str, Any] = {"type": "reply", "customer": {"email": customer_email}, "text": text}
+        if draft:
+            thread["draft"] = True
+        body: dict[str, Any] = {
+            "type": "email",
+            "mailboxId": mailbox_id,
+            "subject": subject,
+            "customer": {"email": customer_email},
+            "threads": [thread],
+            "status": status,
+        }
+        if tags:
+            body["tags"] = tags
+        response = self._send("post", "/conversations", body=body)
+        return self._created_resource_id(response, f"Conversation for {customer_email}")
+
+    def get_conversation(self, conversation_id: int) -> dict[str, Any]:
+        """
+        Fetch a conversation object.
+
+        Parameters
+        ----------
+        conversation_id : int
+            The HelpScout conversation id.
+
+        Returns
+        -------
+        dict[str, Any]
+            The conversation (id, number, subject, primaryCustomer, tags, ...).
+        """
+        return self._get(f"/conversations/{conversation_id}")
+
     def search_conversations(self, query: str, since: date) -> Iterator[dict[str, Any]]:
         """
         Iterate conversations matching a search query, newest first.
@@ -268,6 +398,8 @@ class HelpScoutClient:
             if not any_recent or page >= total_pages:
                 return
             page += 1
+
+    # ---- threads: read ------------------------------------------------------
 
     def conversation_threads(self, conversation_id: int) -> list[dict[str, Any]]:
         """
@@ -324,47 +456,7 @@ class HelpScoutClient:
         payload = self._get(f"/conversations/{conversation_id}/attachments/{attachment_id}/data")
         return base64.b64decode(payload["data"])
 
-    def get_conversation(self, conversation_id: int) -> dict[str, Any]:
-        """
-        Fetch a conversation object.
-
-        Parameters
-        ----------
-        conversation_id : int
-            The HelpScout conversation id.
-
-        Returns
-        -------
-        dict[str, Any]
-            The conversation (id, number, subject, primaryCustomer, tags, ...).
-        """
-        return self._get(f"/conversations/{conversation_id}")
-
-    def _created_resource_id(self, response: requests.Response, action: str) -> int:
-        """
-        Extract the ``Resource-ID`` header of a creation response.
-
-        Parameters
-        ----------
-        response : requests.Response
-            The 201 response of a create request.
-        action : str
-            Description of the request, for the error message.
-
-        Returns
-        -------
-        int
-            The id of the created resource.
-
-        Raises
-        ------
-        HelpScoutError
-            If the response carries no ``Resource-ID`` header.
-        """
-        resource_id = response.headers.get("Resource-ID")
-        if resource_id is None:
-            raise HelpScoutError(f"{action} returned no Resource-ID header")
-        return int(resource_id)
+    # ---- threads: write -----------------------------------------------------
 
     def add_note(self, conversation_id: int, text: str) -> int:
         """
@@ -385,26 +477,6 @@ class HelpScoutClient:
         response = self._send("post", f"/conversations/{conversation_id}/notes", body={"text": text})
         self._thread_cache.pop(conversation_id, None)
         return self._created_resource_id(response, f"Note on conversation {conversation_id}")
-
-    def update_thread_text(self, conversation_id: int, thread_id: int, text: str) -> None:
-        """
-        Replace the body of an existing thread (e.g. a note).
-
-        Parameters
-        ----------
-        conversation_id : int
-            The HelpScout conversation id.
-        thread_id : int
-            The id of the thread to update.
-        text : str
-            The new thread body (HTML allowed).
-        """
-        self._send(
-            "patch",
-            f"/conversations/{conversation_id}/threads/{thread_id}",
-            body={"op": "replace", "path": "/text", "value": text},
-        )
-        self._thread_cache.pop(conversation_id, None)
 
     def create_reply(self, conversation_id: int, customer_id: int, text: str, draft: bool = False) -> int:
         """
@@ -433,6 +505,26 @@ class HelpScoutClient:
         )
         self._thread_cache.pop(conversation_id, None)
         return self._created_resource_id(response, f"Reply on conversation {conversation_id}")
+
+    def update_thread_text(self, conversation_id: int, thread_id: int, text: str) -> None:
+        """
+        Replace the body of an existing thread (e.g. a note).
+
+        Parameters
+        ----------
+        conversation_id : int
+            The HelpScout conversation id.
+        thread_id : int
+            The id of the thread to update.
+        text : str
+            The new thread body (HTML allowed).
+        """
+        self._send(
+            "patch",
+            f"/conversations/{conversation_id}/threads/{thread_id}",
+            body={"op": "replace", "path": "/text", "value": text},
+        )
+        self._thread_cache.pop(conversation_id, None)
 
     def send_draft(self, conversation_id: int, thread_id: int) -> None:
         """
@@ -464,6 +556,8 @@ class HelpScoutClient:
             body={"op": "replace", "path": "/state", "value": "published"},
         )
         self._thread_cache.pop(conversation_id, None)
+
+    # ---- conversation state -------------------------------------------------
 
     def snooze_conversation(
         self, conversation_id: int, snoozed_until: datetime, unsnooze_on_customer_reply: bool = True
@@ -533,65 +627,3 @@ class HelpScoutClient:
         current = [tag["tag"] if isinstance(tag, dict) else str(tag) for tag in conversation.get("tags", [])]
         merged = current + [tag for tag in tags if tag not in current]
         self._send("put", f"/conversations/{conversation_id}/tags", body={"tags": merged})
-
-    def create_conversation(
-        self,
-        mailbox_id: int,
-        subject: str,
-        customer_email: str,
-        text: str,
-        *,
-        draft: bool = False,
-        tags: list[str] | None = None,
-        status: str = "active",
-    ) -> int:
-        """
-        Open a new email conversation addressed to a customer.
-
-        Parameters
-        ----------
-        mailbox_id : int
-            The HelpScout mailbox to open the conversation in.
-        subject : str
-            The conversation subject.
-        customer_email : str
-            Address of the customer the conversation is with.
-        text : str
-            The message body (HTML allowed).
-        draft : bool
-            When ``True`` the outgoing reply is saved as a draft and **no email is
-            sent**, so it can be reviewed and edited before going out. Publish it
-            afterwards with :meth:`send_draft`, which preserves any edits made in
-            HelpScout. When ``False`` the message is delivered immediately.
-        tags : list[str] | None
-            Tags to apply to the new conversation.
-        status : str
-            Conversation status, one of ``active``, ``closed``, ``open``,
-            ``pending`` or ``spam``. Note there is no ``draft`` status — drafting
-            is a property of the reply thread, which is what ``draft`` controls.
-
-        Returns
-        -------
-        int
-            The id of the created conversation.
-
-        Raises
-        ------
-        HelpScoutError
-            If the API rejects the request or returns no ``Resource-ID`` header.
-        """
-        thread: dict[str, Any] = {"type": "reply", "customer": {"email": customer_email}, "text": text}
-        if draft:
-            thread["draft"] = True
-        body: dict[str, Any] = {
-            "type": "email",
-            "mailboxId": mailbox_id,
-            "subject": subject,
-            "customer": {"email": customer_email},
-            "threads": [thread],
-            "status": status,
-        }
-        if tags:
-            body["tags"] = tags
-        response = self._send("post", "/conversations", body=body)
-        return self._created_resource_id(response, f"Conversation for {customer_email}")
