@@ -1,0 +1,81 @@
+{# Custom pdoc template: group the sidebar member list under labelled headings.
+
+   pdoc renders the sidebar from `nav_members`, a defaultmacro intended to be overridden
+   (see https://github.com/mitmproxy/pdoc/tree/main/examples/custom-template). The default
+   emits one flat list in source order; this version partitions it into the same groups the
+   class is organised into, with a heading before each run.
+
+   Group membership has to live somewhere the template can see — pdoc exposes names, kinds
+   and docstrings, not source comments — so it is declared here. Anything not named below
+   still appears, under "Other", so a newly added method is visibly ungrouped rather than
+   silently dropped or appended in the wrong place.
+#}
+{% extends "default/module.html.jinja2" %}
+
+{% set NAV_GROUPS = [
+    ("Conversations", ["create_conversation", "get_conversation", "search_conversations"]),
+    ("Threads: read", ["conversation_threads", "conversation_body", "attachment_data"]),
+    ("Threads: write", ["add_note", "create_reply", "update_thread_text", "send_draft"]),
+    ("Conversation state", ["snooze_conversation", "close_conversation", "add_tags"]),
+] %}
+
+{% macro nav_link(m) %}
+    <li>
+        {% if m.kind == "class" %}
+            <a class="class" href="#{{ m.qualname }}">{{ m.qualname }}</a>
+            {% if m.own_members %}
+                {{ nav_members(m.own_members) | indent(12) }}
+            {% endif %}
+        {% elif m.kind == "module" %}
+            <a class="module" href="#{{ m.name }}">{{ m.name }}</a>
+        {% elif m.name == "__init__" %}
+            <a class="function" href="#{{ m.qualname }}">{{ m.qualname.split(".")[-2] }}</a>
+        {% else %}
+            <a class="{{ m.kind }}" href="#{{ m.qualname }}">{{ m.name }}</a>
+        {% endif %}
+    </li>
+{% endmacro %}
+
+{% defaultmacro nav_members(members) %}
+    {% set visible = [] %}
+    {% for m in members if is_public(m) | trim %}{% set _ = visible.append(m) %}{% endfor %}
+    {% set names = visible | map(attribute="name") | list %}
+    {% set grouped = NAV_GROUPS | map(attribute=1) | sum(start=[]) %}
+    {% set use_groups = names | select("in", grouped) | list | length > 0 %}
+    <ul class="memberlist">
+        {% if use_groups %}
+            {% for heading, group_names in NAV_GROUPS %}
+                {% set present = group_names | select("in", names) | list %}
+                {% if present %}
+                    <li class="nav-group">{{ heading }}</li>
+                    {% for name in present %}
+                        {% for m in visible if m.name == name %}{{ nav_link(m) }}{% endfor %}
+                    {% endfor %}
+                {% endif %}
+            {% endfor %}
+            {% set other = visible | rejectattr("name", "in", grouped) | list %}
+            {% if other %}
+                <li class="nav-group nav-group-other">Other</li>
+                {% for m in other %}{{ nav_link(m) }}{% endfor %}
+            {% endif %}
+        {% else %}
+            {% for m in visible %}{{ nav_link(m) }}{% endfor %}
+        {% endif %}
+    </ul>
+{% enddefaultmacro %}
+
+{% block style %}
+    {{ super() }}
+    <style>
+        nav.pdoc li.nav-group {
+            list-style: none;
+            margin: 1em 0 .2em -1em;
+            font-size: .85em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: var(--muted, #666);
+        }
+        nav.pdoc li.nav-group-other { color: #b5651d; }
+    </style>
+{% endblock %}
