@@ -67,15 +67,23 @@
 {% block style %}
     {{ super() }}
     <style>
+        /* pdoc indents sidebar entries via `nav.pdoc li a`, not the li, so a heading — which
+           has no anchor — already sits at the nav's left padding edge. Indent it with padding
+           rather than pulling it left with a negative margin, which put it outside the nav and
+           clipped the first characters. --indent less than the anchors keeps the hierarchy. */
         nav.pdoc li.nav-group {
             list-style: none;
-            margin: 1em 0 .2em -1em;
-            font-size: .85em;
-            font-weight: 600;
+            margin: 1.1em 0 .1em;
+            padding: .2rem 0 .2rem var(--pad);
+            font-size: .8em;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: .04em;
-            color: var(--muted, #666);
+            letter-spacing: .05em;
+            color: var(--muted);
         }
+        nav.pdoc li.nav-group:first-child { margin-top: .2em; }
+        /* headings are not links; the row hover would imply otherwise */
+        nav.pdoc li.nav-group:hover { background-color: transparent; }
         nav.pdoc li.nav-group-other { color: #b5651d; }
     </style>
 {% endblock %}
