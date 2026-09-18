@@ -17,15 +17,15 @@ This project adheres to a Code of Conduct that all contributors are expected to 
 ### Submitting Pull Requests
 
 1. **Fork** the repository
-2. **Create a feature branch**: `git checkout -b feature/your-feature-name`
-3. **Make your changes**:
+1. **Create a feature branch**: `git checkout -b feature/your-feature-name`
+1. **Make your changes**:
    - Follow existing code style (Black, isort, flake8)
    - Add tests for new functionality
    - Update docstrings (NumPy style)
    - Run `pre-commit run --all-files` before committing
-4. **Commit**: Use clear, descriptive commit messages
-5. **Push**: `git push origin feature/your-feature-name`
-6. **Open a Pull Request** with:
+1. **Commit**: Use clear, descriptive commit messages
+1. **Push**: `git push origin feature/your-feature-name`
+1. **Open a Pull Request** with:
    - Description of what changed and why
    - Link to related issues
    - Test results
@@ -68,6 +68,7 @@ pytest tests/test_client.py::test_parse_created_at
 ### Code Style
 
 This project uses:
+
 - **Black** (line length 120) for formatting
 - **isort** for import sorting
 - **flake8** for linting
@@ -75,6 +76,24 @@ This project uses:
 - **bandit** for security checks
 
 Pre-commit hooks enforce these automatically.
+
+### Where New Methods Go
+
+`HelpScoutClient` is organised into groups, each marked by a comment banner, and the generated API docs list methods in **source order**. A method appended to the end of the class therefore lands at the end of the documentation, away from everything it belongs with — which is how the listing got scrambled in the first place.
+
+So put a new method inside the group it belongs to:
+
+| Group | Covers |
+| --- | --- |
+| `# ---- internals ----` | auth, transport, request helpers — anything underscore-prefixed |
+| `# ---- conversations: create and read ----` | opening a conversation, fetching or searching for one |
+| `# ---- threads: read ----` | reading threads, bodies, attachments |
+| `# ---- threads: write ----` | adding notes and replies, editing and sending them |
+| `# ---- conversation state ----` | status, snoozing, tags |
+
+If a method genuinely does not fit any of them, add a new group with its own banner rather than appending to the end, and say so in the pull request — a new group is a signal the client has grown a new area of responsibility.
+
+The grouping is also listed in the `HelpScoutClient` class docstring, which renders above the members on the docs page. Update it when you add or move a method.
 
 ### Docstring Style
 
