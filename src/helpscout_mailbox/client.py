@@ -533,3 +533,65 @@ class HelpScoutClient:
         current = [tag["tag"] if isinstance(tag, dict) else str(tag) for tag in conversation.get("tags", [])]
         merged = current + [tag for tag in tags if tag not in current]
         self._send("put", f"/conversations/{conversation_id}/tags", body={"tags": merged})
+
+    def create_conversation(
+        self,
+        mailbox_id: int,
+        subject: str,
+        customer_email: str,
+        text: str,
+        *,
+        draft: bool = False,
+        tags: list[str] | None = None,
+        status: str = "active",
+    ) -> int:
+        """
+        Open a new email conversation addressed to a customer.
+
+        Parameters
+        ----------
+        mailbox_id : int
+            The HelpScout mailbox to open the conversation in.
+        subject : str
+            The conversation subject.
+        customer_email : str
+            Address of the customer the conversation is with.
+        text : str
+            The message body (HTML allowed).
+        draft : bool
+            When ``True`` the outgoing reply is saved as a draft and **no email is
+            sent**, so it can be reviewed and edited before going out. Publish it
+            afterwards with :meth:`send_draft`, which preserves any edits made in
+            HelpScout. When ``False`` the message is delivered immediately.
+        tags : list[str] | None
+            Tags to apply to the new conversation.
+        status : str
+            Conversation status, one of ``active``, ``closed``, ``open``,
+            ``pending`` or ``spam``. Note there is no ``draft`` status — drafting
+            is a property of the reply thread, which is what ``draft`` controls.
+
+        Returns
+        -------
+        int
+            The id of the created conversation.
+
+        Raises
+        ------
+        HelpScoutError
+            If the API rejects the request or returns no ``Resource-ID`` header.
+        """
+        thread: dict[str, Any] = {"type": "reply", "customer": {"email": customer_email}, "text": text}
+        if draft:
+            thread["draft"] = True
+        body: dict[str, Any] = {
+            "type": "email",
+            "mailboxId": mailbox_id,
+            "subject": subject,
+            "customer": {"email": customer_email},
+            "threads": [thread],
+            "status": status,
+        }
+        if tags:
+            body["tags"] = tags
+        response = self._send("post", "/conversations", body=body)
+        return self._created_resource_id(response, f"Conversation for {customer_email}")

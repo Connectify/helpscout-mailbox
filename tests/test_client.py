@@ -172,3 +172,93 @@ def test_token_refresh_retries_transport_error() -> None:
         client = HelpScoutClient()
     assert client._session.headers["Authorization"] == "Bearer tok"
     assert len(responses.calls) == 2  # first attempt raised, retried once
+
+
+def _token_stub() -> None:
+    """Register the OAuth2 token response every client init performs."""
+    responses.add(
+        responses.POST,
+        "https://api.helpscout.net/v2/oauth2/token",
+        json={"access_token": "test_token", "expires_in": 3600},
+        status=200,
+    )
+
+
+def _client() -> HelpScoutClient:
+    with patch.dict(os.environ, {"HELPSCOUT_APP_ID": "test_id", "HELPSCOUT_APP_SECRET": "test_secret"}):
+        return HelpScoutClient()
+
+
+@responses.activate
+def test_create_conversation_posts_reply_thread() -> None:
+    """create_conversation POSTs an email conversation with a reply thread and returns its id."""
+    _token_stub()
+    responses.add(
+        responses.POST,
+        "https://api.helpscout.net/v2/conversations",
+        status=201,
+        headers={"Resource-ID": "4242"},
+    )
+    client = _client()
+    conv_id = client.create_conversation(24584, "Subject here", "user@example.com", "Body here")
+
+    assert conv_id == 4242
+    sent = json.loads(responses.calls[1].request.body)
+    assert sent["type"] == "email"
+    assert sent["mailboxId"] == 24584
+    assert sent["subject"] == "Subject here"
+    assert sent["customer"] == {"email": "user@example.com"}
+    assert sent["status"] == "active"
+    assert sent["threads"] == [{"type": "reply", "customer": {"email": "user@example.com"}, "text": "Body here"}]
+    assert "tags" not in sent
+
+
+@responses.activate
+def test_create_conversation_draft_marks_thread_not_status() -> None:
+    """draft=True flags the reply thread; it must not become a conversation status.
+
+    HelpScout rejects `status: "draft"` (the enum is active/closed/open/pending/spam) and also
+    rejects a conversation made only of note threads. Drafting is a property of the reply.
+    """
+    _token_stub()
+    responses.add(
+        responses.POST,
+        "https://api.helpscout.net/v2/conversations",
+        status=201,
+        headers={"Resource-ID": "7"},
+    )
+    client = _client()
+    client.create_conversation(1, "s", "user@example.com", "b", draft=True)
+
+    sent = json.loads(responses.calls[1].request.body)
+    assert sent["threads"][0]["draft"] is True
+    assert sent["threads"][0]["type"] == "reply"
+    assert sent["status"] == "active"
+
+
+@responses.activate
+def test_create_conversation_passes_tags_and_status() -> None:
+    """Tags are forwarded when given, and a non-default status is honoured."""
+    _token_stub()
+    responses.add(
+        responses.POST,
+        "https://api.helpscout.net/v2/conversations",
+        status=201,
+        headers={"Resource-ID": "9"},
+    )
+    client = _client()
+    client.create_conversation(1, "s", "user@example.com", "b", tags=["alpha", "beta"], status="pending")
+
+    sent = json.loads(responses.calls[1].request.body)
+    assert sent["tags"] == ["alpha", "beta"]
+    assert sent["status"] == "pending"
+
+
+@responses.activate
+def test_create_conversation_without_resource_id_raises() -> None:
+    """A creation response with no Resource-ID header is an error, not a silent 0."""
+    _token_stub()
+    responses.add(responses.POST, "https://api.helpscout.net/v2/conversations", status=201)
+    client = _client()
+    with pytest.raises(HelpScoutError, match="Resource-ID"):
+        client.create_conversation(1, "s", "user@example.com", "b")
