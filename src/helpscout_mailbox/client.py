@@ -2,6 +2,7 @@
 
 import base64
 import logging
+import mimetypes
 import os
 import time
 from datetime import date, datetime, timedelta, timezone
@@ -86,7 +87,7 @@ class HelpScoutClient:
 
     **Threads — write**
         :meth:`add_note`, :meth:`create_reply`, :meth:`update_thread_text`,
-        :meth:`send_draft`
+        :meth:`upload_attachment`, :meth:`send_draft`
 
     **Conversation state**
         :meth:`snooze_conversation`, :meth:`close_conversation`, :meth:`add_tags`
@@ -523,6 +524,37 @@ class HelpScoutClient:
             "patch",
             f"/conversations/{conversation_id}/threads/{thread_id}",
             body={"op": "replace", "path": "/text", "value": text},
+        )
+        self._thread_cache.pop(conversation_id, None)
+
+    def upload_attachment(
+        self, conversation_id: int, thread_id: int, file_name: str, data: bytes, mime_type: str | None = None
+    ) -> None:
+        """
+        Attach a file to an existing thread (e.g. a note).
+
+        HelpScout scans the upload; a file it flags as malicious stays attached but is not downloadable.
+
+        Parameters
+        ----------
+        conversation_id : int
+            The HelpScout conversation id.
+        thread_id : int
+            The id of the thread to attach the file to.
+        file_name : str
+            The name the attachment is shown under.
+        data : bytes
+            The raw file content.
+        mime_type : str | None
+            The attachment's MIME type; guessed from ``file_name`` when omitted, falling back to
+            ``application/octet-stream``.
+        """
+        if mime_type is None:
+            mime_type = mimetypes.guess_type(file_name)[0] or "application/octet-stream"
+        self._send(
+            "post",
+            f"/conversations/{conversation_id}/threads/{thread_id}/attachments",
+            body={"fileName": file_name, "mimeType": mime_type, "data": base64.b64encode(data).decode("ascii")},
         )
         self._thread_cache.pop(conversation_id, None)
 

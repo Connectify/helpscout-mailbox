@@ -77,6 +77,7 @@ client.add_tags(12345, ["billing", "processed"])
 ### Attachments
 
 - `attachment_data(conversation_id, attachment_id)` - Download attachment bytes
+- `upload_attachment(conversation_id, thread_id, file_name, data, mime_type)` - Attach a file to a thread
 
 ## Environment Variables
 
