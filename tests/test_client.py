@@ -262,3 +262,49 @@ def test_create_conversation_without_resource_id_raises() -> None:
     client = _client()
     with pytest.raises(HelpScoutError, match="Resource-ID"):
         client.create_conversation(1, "s", "user@example.com", "b")
+
+
+@responses.activate
+def test_upload_attachment_posts_base64_and_guesses_mime_type() -> None:
+    """upload_attachment POSTs base64 data to the thread, guesses the MIME type from the name, and clears the cache."""
+    responses.add(
+        responses.POST,
+        "https://api.helpscout.net/v2/oauth2/token",
+        json={"access_token": "test_token", "expires_in": 3600},
+        status=200,
+    )
+    responses.add(
+        responses.POST,
+        "https://api.helpscout.net/v2/conversations/7/threads/42/attachments",
+        status=201,
+    )
+    with patch.dict(os.environ, {"HELPSCOUT_APP_ID": "test_id", "HELPSCOUT_APP_SECRET": "test_secret"}):
+        client = HelpScoutClient()
+    client._thread_cache[7] = [{"id": 42}]
+    client.upload_attachment(7, 42, "events.zip", b"PK\x03\x04")
+    assert 7 not in client._thread_cache
+    assert json.loads(responses.calls[1].request.body) == {
+        "fileName": "events.zip",
+        "mimeType": "application/zip",
+        "data": "UEsDBA==",
+    }
+
+
+@responses.activate
+def test_upload_attachment_unknown_extension_falls_back_to_octet_stream() -> None:
+    """A file name with no recognisable extension is uploaded as application/octet-stream."""
+    responses.add(
+        responses.POST,
+        "https://api.helpscout.net/v2/oauth2/token",
+        json={"access_token": "test_token", "expires_in": 3600},
+        status=200,
+    )
+    responses.add(
+        responses.POST,
+        "https://api.helpscout.net/v2/conversations/7/threads/42/attachments",
+        status=201,
+    )
+    with patch.dict(os.environ, {"HELPSCOUT_APP_ID": "test_id", "HELPSCOUT_APP_SECRET": "test_secret"}):
+        client = HelpScoutClient()
+    client.upload_attachment(7, 42, "capture.unknownext", b"x")
+    assert json.loads(responses.calls[1].request.body)["mimeType"] == "application/octet-stream"
