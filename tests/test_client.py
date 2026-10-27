@@ -308,3 +308,59 @@ def test_upload_attachment_unknown_extension_falls_back_to_octet_stream() -> Non
         client = HelpScoutClient()
     client.upload_attachment(7, 42, "capture.unknownext", b"x")
     assert json.loads(responses.calls[1].request.body)["mimeType"] == "application/octet-stream"
+
+
+@responses.activate
+def test_token_refresh_retries_5xx() -> None:
+    """A 503 on the OAuth2 token POST is retried rather than aborting the run (#9)."""
+    responses.add(
+        responses.POST,
+        "https://api.helpscout.net/v2/oauth2/token",
+        body="upstream connect error or disconnect/reset before headers",
+        status=503,
+    )
+    responses.add(
+        responses.POST,
+        "https://api.helpscout.net/v2/oauth2/token",
+        json={"access_token": "tok", "expires_in": 3600},
+        status=200,
+    )
+    with (
+        patch.dict(os.environ, {"HELPSCOUT_APP_ID": "id", "HELPSCOUT_APP_SECRET": "secret"}),
+        patch("helpscout_mailbox.client.time.sleep"),
+    ):
+        client = HelpScoutClient()
+    assert client._session.headers["Authorization"] == "Bearer tok"
+    assert len(responses.calls) == 2  # 503 then success
+
+
+@responses.activate
+def test_token_refresh_gives_up_after_five_5xx() -> None:
+    """A persistently failing token endpoint raises rather than looping forever."""
+    for _ in range(5):
+        responses.add(responses.POST, "https://api.helpscout.net/v2/oauth2/token", body="boom", status=503)
+    with (
+        patch.dict(os.environ, {"HELPSCOUT_APP_ID": "id", "HELPSCOUT_APP_SECRET": "secret"}),
+        patch("helpscout_mailbox.client.time.sleep"),
+    ):
+        with pytest.raises(HelpScoutError, match="still failing"):
+            HelpScoutClient()
+    assert len(responses.calls) == 5
+
+
+@responses.activate
+def test_token_refresh_does_not_retry_4xx() -> None:
+    """A 401 is a credentials problem, not a blip, so it must still fail immediately."""
+    responses.add(
+        responses.POST,
+        "https://api.helpscout.net/v2/oauth2/token",
+        json={"error": "invalid_client"},
+        status=401,
+    )
+    with (
+        patch.dict(os.environ, {"HELPSCOUT_APP_ID": "bad", "HELPSCOUT_APP_SECRET": "bad"}),
+        patch("helpscout_mailbox.client.time.sleep"),
+    ):
+        with pytest.raises(HelpScoutError, match="OAuth2 token request failed"):
+            HelpScoutClient()
+    assert len(responses.calls) == 1  # no retry

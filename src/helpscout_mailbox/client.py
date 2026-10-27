@@ -153,21 +153,41 @@ class HelpScoutClient:
         """
         Fetch a fresh access token and store it on the session.
 
+        Retries 5xx with backoff, matching :meth:`_send`. A transient upstream error
+        here is otherwise fatal to the whole run, and every caller reaches it at a
+        point with no higher retry to fall back on: construction, token expiry, and
+        a 401 mid-request.
+
         Raises
         ------
         HelpScoutError
-            If the token request fails.
+            If the token request fails, or still returns 5xx after five attempts.
         """
-        response = self._request_with_transport_retry(
-            "post",
-            TOKEN_URL,
-            data={"grant_type": "client_credentials", "client_id": self._app_id, "client_secret": self._app_secret},
-        )
-        if response.status_code != 200:
-            raise HelpScoutError(f"OAuth2 token request failed ({response.status_code}): {response.text}")
-        payload = response.json()
-        self._session.headers["Authorization"] = f"Bearer {payload['access_token']}"
-        self._token_expires_at = time.time() + payload.get("expires_in", 3600) - 60
+        for attempt in range(5):
+            response = self._request_with_transport_retry(
+                "post",
+                TOKEN_URL,
+                data={
+                    "grant_type": "client_credentials",
+                    "client_id": self._app_id,
+                    "client_secret": self._app_secret,
+                },
+            )
+            if response.status_code >= 500:
+                wait = 5 * (attempt + 1)
+                logger.warning(
+                    f"HelpScout {response.status_code} on OAuth2 token request; "
+                    f"retrying in {wait}s (attempt {attempt + 1}/5)"
+                )
+                time.sleep(wait)
+                continue
+            if response.status_code != 200:
+                raise HelpScoutError(f"OAuth2 token request failed ({response.status_code}): {response.text}")
+            payload = response.json()
+            self._session.headers["Authorization"] = f"Bearer {payload['access_token']}"
+            self._token_expires_at = time.time() + payload.get("expires_in", 3600) - 60
+            return
+        raise HelpScoutError("OAuth2 token request still failing (5xx) after 5 attempts")
 
     def _send(
         self,
