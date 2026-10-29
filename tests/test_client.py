@@ -404,7 +404,7 @@ def test_saved_replies_can_ask_for_chat_replies() -> None:
     )
     _client().saved_replies(122406, include_chat_replies=True)
 
-    assert "includeChatReplies=true" in responses.calls[1].request.url
+    assert "includeChatReplies=true" in str(responses.calls[1].request.url)
 
 
 @responses.activate
@@ -441,7 +441,7 @@ def test_saved_reply_by_name_resolves_then_fetches() -> None:
     reply = _client().saved_reply_by_name(122406, "abuse-report-torrent")
 
     assert reply["text"] == "<p>Thanks</p>"
-    assert responses.calls[2].request.url.endswith("/saved-replies/1115666")
+    assert str(responses.calls[2].request.url).endswith("/saved-replies/1115666")
 
 
 @responses.activate
