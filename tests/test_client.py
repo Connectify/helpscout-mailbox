@@ -3,12 +3,25 @@
 import json
 import os
 from datetime import date, datetime, timezone
+from typing import Any
 from unittest.mock import patch
 
 import pytest
 import responses
 
 from helpscout_mailbox import HelpScoutClient, HelpScoutError, parse_created_at
+
+
+def _sent_json(call: responses.Call) -> Any:
+    """
+    Decode a recorded request body as JSON.
+
+    ``PreparedRequest.body`` is ``bytes | str | None``, and a test asserting on a
+    body that was never sent should say so rather than fail inside ``json.loads``.
+    """
+    body = call.request.body
+    assert body is not None, f"{call.request.method} {call.request.url} was sent with no body"
+    return json.loads(body)
 
 
 def test_parse_created_at() -> None:
@@ -119,7 +132,7 @@ def test_close_conversation_issues_patch() -> None:
     close_call = responses.calls[1]
     assert close_call.request.url == "https://api.helpscout.net/v2/conversations/7"
     assert close_call.request.method == "PATCH"
-    assert json.loads(close_call.request.body) == {"op": "replace", "path": "/status", "value": "closed"}
+    assert _sent_json(close_call) == {"op": "replace", "path": "/status", "value": "closed"}
 
 
 @responses.activate
@@ -203,7 +216,7 @@ def test_create_conversation_posts_reply_thread() -> None:
     conv_id = client.create_conversation(24584, "Subject here", "user@example.com", "Body here")
 
     assert conv_id == 4242
-    sent = json.loads(responses.calls[1].request.body)
+    sent = _sent_json(responses.calls[1])
     assert sent["type"] == "email"
     assert sent["mailboxId"] == 24584
     assert sent["subject"] == "Subject here"
@@ -230,7 +243,7 @@ def test_create_conversation_draft_marks_thread_not_status() -> None:
     client = _client()
     client.create_conversation(1, "s", "user@example.com", "b", draft=True)
 
-    sent = json.loads(responses.calls[1].request.body)
+    sent = _sent_json(responses.calls[1])
     assert sent["threads"][0]["draft"] is True
     assert sent["threads"][0]["type"] == "reply"
     assert sent["status"] == "active"
@@ -249,7 +262,7 @@ def test_create_conversation_passes_tags_and_status() -> None:
     client = _client()
     client.create_conversation(1, "s", "user@example.com", "b", tags=["alpha", "beta"], status="pending")
 
-    sent = json.loads(responses.calls[1].request.body)
+    sent = _sent_json(responses.calls[1])
     assert sent["tags"] == ["alpha", "beta"]
     assert sent["status"] == "pending"
 
@@ -283,7 +296,7 @@ def test_upload_attachment_posts_base64_and_guesses_mime_type() -> None:
     client._thread_cache[7] = [{"id": 42}]
     client.upload_attachment(7, 42, "events.zip", b"PK\x03\x04")
     assert 7 not in client._thread_cache
-    assert json.loads(responses.calls[1].request.body) == {
+    assert _sent_json(responses.calls[1]) == {
         "fileName": "events.zip",
         "mimeType": "application/zip",
         "data": "UEsDBA==",
@@ -307,7 +320,7 @@ def test_upload_attachment_unknown_extension_falls_back_to_octet_stream() -> Non
     with patch.dict(os.environ, {"HELPSCOUT_APP_ID": "test_id", "HELPSCOUT_APP_SECRET": "test_secret"}):
         client = HelpScoutClient()
     client.upload_attachment(7, 42, "capture.unknownext", b"x")
-    assert json.loads(responses.calls[1].request.body)["mimeType"] == "application/octet-stream"
+    assert _sent_json(responses.calls[1])["mimeType"] == "application/octet-stream"
 
 
 @responses.activate

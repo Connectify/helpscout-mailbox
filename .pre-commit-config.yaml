@@ -47,6 +47,11 @@ repos:
   - hooks:
       - additional_dependencies:
           - types-requests
+          # pre-commit runs mypy in an isolated venv, so anything tests/ imports must
+          # be listed here or mypy cannot resolve it. Without responses, every
+          # @responses.activate reads as an untyped decorator under strict mode.
+          - responses
+          - pytest
         args:
           - --config-file=pyproject.toml
         id: mypy
