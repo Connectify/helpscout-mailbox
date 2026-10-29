@@ -79,6 +79,12 @@ client.add_tags(12345, ["billing", "processed"])
 - `attachment_data(conversation_id, attachment_id)` - Download attachment bytes
 - `upload_attachment(conversation_id, thread_id, file_name, data, mime_type)` - Attach a file to a thread
 
+### Saved Replies
+
+- `saved_replies(mailbox_id, include_chat_replies)` - List saved replies (metadata and preview only)
+- `saved_reply(mailbox_id, saved_reply_id)` - Fetch one, including its HTML `text`
+- `saved_reply_by_name(mailbox_id, name)` - Look one up by the name it is filed under
+
 ## Environment Variables
 
 | Variable | Required | Description |
