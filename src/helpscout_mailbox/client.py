@@ -270,6 +270,35 @@ class HelpScoutClient:
         payload: dict[str, Any] = self._send("get", path, params=params).json()
         return payload
 
+    def _get_array(self, path: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        """
+        Issue an authenticated GET for a path that answers with a bare JSON array.
+
+        Almost every Mailbox endpoint wraps its collection in an ``_embedded`` envelope with
+        paging, which is what :meth:`_get` is for. ``/mailboxes/{id}/saved-replies`` does not:
+        it returns the array itself, so reading it through :meth:`_get` would hand back a list
+        from something annotated as returning a dict.
+
+        Parameters
+        ----------
+        path : str
+            Path under the v2 base URL.
+        params : dict[str, Any] | None
+            Query string parameters.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            The decoded JSON array.
+
+        Raises
+        ------
+        HelpScoutError
+            If the API returns a non-2xx response after retries.
+        """
+        payload: list[dict[str, Any]] = self._send("get", path, params=params).json()
+        return payload
+
     def _created_resource_id(self, response: requests.Response, action: str) -> int:
         """
         Extract the ``Resource-ID`` header of a creation response.
@@ -679,3 +708,87 @@ class HelpScoutClient:
         current = [tag["tag"] if isinstance(tag, dict) else str(tag) for tag in conversation.get("tags", [])]
         merged = current + [tag for tag in tags if tag not in current]
         self._send("put", f"/conversations/{conversation_id}/tags", body={"tags": merged})
+
+    def saved_replies(self, mailbox_id: int, include_chat_replies: bool = False) -> list[dict[str, Any]]:
+        """
+        List a mailbox's saved replies.
+
+        Metadata only: each entry carries ``id``, ``name`` and a truncated ``preview``, not the
+        full text. :meth:`saved_reply` is what returns the body.
+
+        Parameters
+        ----------
+        mailbox_id : int
+            The HelpScout mailbox id.
+        include_chat_replies : bool
+            Include replies written for chat, which have no email content. Off by default,
+            matching the API.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            The saved replies, with ``id`` normalised to int — this endpoint reports it as a
+            string where the rest of the API uses numbers.
+
+        Raises
+        ------
+        HelpScoutError
+            If the API returns a non-2xx response after retries.
+        """
+        params = {"includeChatReplies": "true"} if include_chat_replies else None
+        replies = self._get_array(f"/mailboxes/{mailbox_id}/saved-replies", params=params)
+        return [{**reply, "id": int(reply["id"])} for reply in replies]
+
+    def saved_reply(self, mailbox_id: int, saved_reply_id: int) -> dict[str, Any]:
+        """
+        Fetch one saved reply, including its text.
+
+        Parameters
+        ----------
+        mailbox_id : int
+            The HelpScout mailbox id.
+        saved_reply_id : int
+            The saved reply id.
+
+        Returns
+        -------
+        dict[str, Any]
+            The saved reply. ``text`` is HTML, as the Help Scout editor stores it; callers
+            putting it somewhere that wants plain text have to strip it themselves.
+
+        Raises
+        ------
+        HelpScoutError
+            If the API returns a non-2xx response after retries.
+        """
+        return self._get(f"/mailboxes/{mailbox_id}/saved-replies/{saved_reply_id}")
+
+    def saved_reply_by_name(self, mailbox_id: int, name: str) -> dict[str, Any]:
+        """
+        Fetch a saved reply by the name it is filed under.
+
+        The name is the stable handle — "abuse-report-torrent" is what a person asks for, and
+        it survives edits that the id does not guarantee. Costs two requests, because the list
+        endpoint omits the text.
+
+        Parameters
+        ----------
+        mailbox_id : int
+            The HelpScout mailbox id.
+        name : str
+            The saved reply's name, matched exactly.
+
+        Returns
+        -------
+        dict[str, Any]
+            The saved reply, as :meth:`saved_reply` returns it.
+
+        Raises
+        ------
+        HelpScoutError
+            If no saved reply in the mailbox has that name.
+        """
+        for reply in self.saved_replies(mailbox_id):
+            if reply.get("name") == name:
+                return self.saved_reply(mailbox_id, reply["id"])
+        raise HelpScoutError(f"No saved reply named {name!r} in mailbox {mailbox_id}")

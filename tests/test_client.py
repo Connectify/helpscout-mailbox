@@ -364,3 +364,95 @@ def test_token_refresh_does_not_retry_4xx() -> None:
         with pytest.raises(HelpScoutError, match="OAuth2 token request failed"):
             HelpScoutClient()
     assert len(responses.calls) == 1  # no retry
+
+
+# Saved replies: the one Mailbox collection that answers with a bare array instead of an
+# _embedded envelope, and reports its ids as strings.
+_SAVED_REPLY_LIST = [
+    {"id": "1115666", "name": "abuse-report-torrent", "preview": "Thanks for passing along", "chatPreview": ""},
+    {"id": "726345", "name": "abuse-report-investigating", "preview": "Thanks for bringing", "chatPreview": ""},
+]
+
+
+@responses.activate
+def test_saved_replies_lists_metadata_and_normalises_ids() -> None:
+    """The list endpoint returns a bare array with string ids; both are smoothed over here."""
+    _token_stub()
+    responses.add(
+        responses.GET,
+        "https://api.helpscout.net/v2/mailboxes/122406/saved-replies",
+        json=_SAVED_REPLY_LIST,
+        status=200,
+    )
+    replies = _client().saved_replies(122406)
+
+    assert [reply["id"] for reply in replies] == [1115666, 726345]
+    assert [reply["name"] for reply in replies] == ["abuse-report-torrent", "abuse-report-investigating"]
+    # The list carries a truncated preview, never the body.
+    assert "text" not in replies[0]
+
+
+@responses.activate
+def test_saved_replies_can_ask_for_chat_replies() -> None:
+    """Chat-only replies are excluded by default, matching the API, and opt-in here."""
+    _token_stub()
+    responses.add(
+        responses.GET,
+        "https://api.helpscout.net/v2/mailboxes/122406/saved-replies",
+        json=_SAVED_REPLY_LIST,
+        status=200,
+    )
+    _client().saved_replies(122406, include_chat_replies=True)
+
+    assert "includeChatReplies=true" in responses.calls[1].request.url
+
+
+@responses.activate
+def test_saved_reply_returns_the_text() -> None:
+    """A single fetch is what carries the body, as HTML."""
+    _token_stub()
+    responses.add(
+        responses.GET,
+        "https://api.helpscout.net/v2/mailboxes/122406/saved-replies/1115666",
+        json={"id": 1115666, "name": "abuse-report-torrent", "text": "<p>Thanks for passing along</p>"},
+        status=200,
+    )
+    reply = _client().saved_reply(122406, 1115666)
+
+    assert reply["text"] == "<p>Thanks for passing along</p>"
+
+
+@responses.activate
+def test_saved_reply_by_name_resolves_then_fetches() -> None:
+    """The name is the handle a person uses; resolving it costs the list plus the fetch."""
+    _token_stub()
+    responses.add(
+        responses.GET,
+        "https://api.helpscout.net/v2/mailboxes/122406/saved-replies",
+        json=_SAVED_REPLY_LIST,
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.helpscout.net/v2/mailboxes/122406/saved-replies/1115666",
+        json={"id": 1115666, "name": "abuse-report-torrent", "text": "<p>Thanks</p>"},
+        status=200,
+    )
+    reply = _client().saved_reply_by_name(122406, "abuse-report-torrent")
+
+    assert reply["text"] == "<p>Thanks</p>"
+    assert responses.calls[2].request.url.endswith("/saved-replies/1115666")
+
+
+@responses.activate
+def test_saved_reply_by_name_raises_when_absent() -> None:
+    """A typo must not silently send nothing; the caller is about to post this somewhere."""
+    _token_stub()
+    responses.add(
+        responses.GET,
+        "https://api.helpscout.net/v2/mailboxes/122406/saved-replies",
+        json=_SAVED_REPLY_LIST,
+        status=200,
+    )
+    with pytest.raises(HelpScoutError, match="No saved reply named 'abuse-report-tornado'"):
+        _client().saved_reply_by_name(122406, "abuse-report-tornado")
