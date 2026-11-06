@@ -792,3 +792,101 @@ class HelpScoutClient:
             if reply.get("name") == name:
                 return self.saved_reply(mailbox_id, reply["id"])
         raise HelpScoutError(f"No saved reply named {name!r} in mailbox {mailbox_id}")
+
+    def create_saved_reply(self, mailbox_id: int, name: str, text: str) -> int:
+        """
+        Create a saved reply.
+
+        Parameters
+        ----------
+        mailbox_id : int
+            The HelpScout mailbox id.
+        name : str
+            The name to file it under. This is the handle :meth:`saved_reply_by_name`
+            resolves, so it wants to be stable and unique within the mailbox; the API does
+            not enforce uniqueness, and a duplicate makes that lookup return whichever comes
+            first.
+        text : str
+            The body, as HTML -- the Help Scout editor stores it that way, and plain text
+            arrives as one unbroken paragraph.
+
+        Returns
+        -------
+        int
+            The id of the created saved reply.
+
+        Raises
+        ------
+        HelpScoutError
+            If the API returns a non-2xx response after retries, or the creation response
+            carries no ``Resource-ID`` header.
+        """
+        response = self._send(
+            "post",
+            f"/mailboxes/{mailbox_id}/saved-replies",
+            body={"name": name, "text": text},
+        )
+        return self._created_resource_id(response, f"Saved reply {name!r}")
+
+    def update_saved_reply(
+        self,
+        mailbox_id: int,
+        saved_reply_id: int,
+        name: str | None = None,
+        text: str | None = None,
+    ) -> None:
+        """
+        Edit a saved reply's name, its text, or both.
+
+        The API requires ``name`` on every update, even one that only touches the text, so
+        anything not supplied here is read back from the saved reply and sent unchanged --
+        the same read-modify-write :meth:`add_tags` does. That matters because ``name`` is
+        what :meth:`saved_reply_by_name` resolves: a caller changing only the text must not
+        have to know that omitting the name would reject the request.
+
+        Parameters
+        ----------
+        mailbox_id : int
+            The HelpScout mailbox id.
+        saved_reply_id : int
+            The saved reply id.
+        name : str | None
+            The new name, or None to keep the current one.
+        text : str | None
+            The new body as HTML, or None to keep the current one.
+
+        Raises
+        ------
+        HelpScoutError
+            If neither ``name`` nor ``text`` is given, or the API returns a non-2xx response
+            after retries.
+        """
+        if name is None and text is None:
+            raise HelpScoutError("update_saved_reply needs a name, a text, or both")
+        if name is None or text is None:
+            current = self.saved_reply(mailbox_id, saved_reply_id)
+            name = current["name"] if name is None else name
+            text = current.get("text", "") if text is None else text
+        self._send(
+            "put",
+            f"/mailboxes/{mailbox_id}/saved-replies/{saved_reply_id}",
+            body={"name": name, "text": text},
+        )
+
+    def delete_saved_reply(self, mailbox_id: int, saved_reply_id: int) -> None:
+        """
+        Delete a saved reply.
+
+        Parameters
+        ----------
+        mailbox_id : int
+            The HelpScout mailbox id.
+        saved_reply_id : int
+            The saved reply id.
+
+        Raises
+        ------
+        HelpScoutError
+            If the API returns a non-2xx response after retries.
+        """
+        self._send("delete", f"/mailboxes/{mailbox_id}/saved-replies/{saved_reply_id}")
