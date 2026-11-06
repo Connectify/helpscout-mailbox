@@ -84,6 +84,9 @@ client.add_tags(12345, ["billing", "processed"])
 - `saved_replies(mailbox_id, include_chat_replies)` - List saved replies (metadata and preview only)
 - `saved_reply(mailbox_id, saved_reply_id)` - Fetch one, including its HTML `text`
 - `saved_reply_by_name(mailbox_id, name)` - Look one up by the name it is filed under
+- `create_saved_reply(mailbox_id, name, text)` - Create one; returns the new id
+- `update_saved_reply(mailbox_id, saved_reply_id, name, text)` - Edit the name, the text, or both
+- `delete_saved_reply(mailbox_id, saved_reply_id)` - Delete one
 
 ## Environment Variables
 

@@ -469,3 +469,89 @@ def test_saved_reply_by_name_raises_when_absent() -> None:
     )
     with pytest.raises(HelpScoutError, match="No saved reply named 'abuse-report-tornado'"):
         _client().saved_reply_by_name(122406, "abuse-report-tornado")
+
+
+@responses.activate
+def test_create_saved_reply_posts_and_returns_the_new_id() -> None:
+    """The id comes back in a header, not the body, as every other create in this API does."""
+    _token_stub()
+    responses.add(
+        responses.POST,
+        "https://api.helpscout.net/v2/mailboxes/122406/saved-replies",
+        status=201,
+        headers={"Resource-ID": "2106726"},
+    )
+    new_id = _client().create_saved_reply(122406, "abuse-not-enough-info", "<p>Thanks</p>")
+
+    assert new_id == 2106726
+    assert json.loads(responses.calls[1].request.body or "") == {
+        "name": "abuse-not-enough-info",
+        "text": "<p>Thanks</p>",
+    }
+
+
+@responses.activate
+def test_update_saved_reply_keeps_the_name_when_only_the_text_changes() -> None:
+    """name is required by the API, and it is the handle saved_reply_by_name resolves.
+
+    Omitting it would reject the request, so a text-only edit has to read the current name
+    back and send it unchanged rather than make the caller supply it.
+    """
+    _token_stub()
+    responses.add(
+        responses.GET,
+        "https://api.helpscout.net/v2/mailboxes/122406/saved-replies/1115666",
+        json={"id": 1115666, "name": "abuse-report-torrent", "text": "<p>old</p>"},
+        status=200,
+    )
+    responses.add(
+        responses.PUT,
+        "https://api.helpscout.net/v2/mailboxes/122406/saved-replies/1115666",
+        status=204,
+    )
+    _client().update_saved_reply(122406, 1115666, text="<p>new</p>")
+
+    assert json.loads(responses.calls[2].request.body or "") == {
+        "name": "abuse-report-torrent",
+        "text": "<p>new</p>",
+    }
+
+
+@responses.activate
+def test_update_saved_reply_skips_the_read_when_given_both() -> None:
+    """Nothing needs looking up when the caller supplied every field the API requires."""
+    _token_stub()
+    responses.add(
+        responses.PUT,
+        "https://api.helpscout.net/v2/mailboxes/122406/saved-replies/1115666",
+        status=204,
+    )
+    _client().update_saved_reply(122406, 1115666, name="abuse-report-torrent", text="<p>new</p>")
+
+    assert len(responses.calls) == 2
+    assert responses.calls[1].request.method == "PUT"
+
+
+@responses.activate
+def test_update_saved_reply_rejects_an_empty_edit() -> None:
+    """An update with nothing in it is a caller mistake, not a request worth sending."""
+    _token_stub()
+    with pytest.raises(HelpScoutError, match="needs a name, a text, or both"):
+        _client().update_saved_reply(122406, 1115666)
+
+    assert all(call.request.method != "PUT" for call in responses.calls)
+
+
+@responses.activate
+def test_delete_saved_reply_calls_delete() -> None:
+    """Deleting is unrecoverable, so the method must hit the id it was handed and no other."""
+    _token_stub()
+    responses.add(
+        responses.DELETE,
+        "https://api.helpscout.net/v2/mailboxes/122406/saved-replies/726345",
+        status=204,
+    )
+    _client().delete_saved_reply(122406, 726345)
+
+    assert responses.calls[1].request.method == "DELETE"
+    assert str(responses.calls[1].request.url).endswith("/saved-replies/726345")
